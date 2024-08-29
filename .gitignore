@@ -1,0 +1,12 @@
+*.pth
+*.bin
+*.model
+.env
+*.log
+*.out
+*.err
+*.txt
+*.csv
+*.json
+*.yaml
+*.yml
