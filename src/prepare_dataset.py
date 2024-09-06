@@ -9,7 +9,7 @@ def prepare_dataset():
         dataset = dataset['train']
     
     # Save the dataset locally
-    dataset.save_to_disk("./fine_tuning_dataset")
+    dataset.save_to_disk("/workspace/llama3finetune/fine_tuning_dataset")
     print(f"Dataset prepared with {len(dataset)} examples.")
     
     # Print some information about the dataset
