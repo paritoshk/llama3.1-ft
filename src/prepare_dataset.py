@@ -14,9 +14,6 @@ def prepare_dataset():
     
     # Print some information about the dataset
     print("\nDataset columns:")
-    for col in dataset.column_names:
-        print(f"- {col}: {dataset[col].dtype}")
-    
     print("\nSample entry:")
     print(dataset[0])
 

@@ -4,6 +4,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
+    get_linear_schedule_with_warmup,
 )
 from datasets import load_from_disk
 import torch
@@ -19,6 +20,8 @@ def tokenize_function(examples, tokenizer, max_length=1024):
         for i in range(len(examples['subject_id']))
     ]
     return tokenizer(texts, truncation=True, padding="max_length", max_length=max_length)
+
+
 
 def main():
     # Load model and tokenizer
@@ -40,18 +43,19 @@ def main():
     tokenized_dataset = dataset.map(
         lambda examples: tokenize_function(examples, tokenizer),
         batched=True,
-        remove_columns=dataset.column_names
+        remove_columns=dataset.column_names,
+        num_proc=4  # Adjust based on your CPU cores
     )
 
     # Set up training arguments
     training_args = TrainingArguments(
         output_dir="/workspace/llama3finetune/results",
-        num_train_epochs=3,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
+        num_train_epochs=1,
+        per_device_train_batch_size=2,  # Increased from 1
+        gradient_accumulation_steps=4,  # Increased from 2
         save_steps=500,
         save_total_limit=2,
-        learning_rate=2e-5,
+        learning_rate=5e-5,
         warmup_steps=100,
         logging_dir="/workspace/llama3finetune/logs",
         logging_steps=10,
@@ -59,6 +63,9 @@ def main():
         eval_steps=500,
         load_best_model_at_end=True,
         fp16=True,
+        gradient_checkpointing=True,  # Enable gradient checkpointing
+        max_grad_norm=1.0,  # Add gradient clipping
+        max_steps=1000,  # Add max steps
     )
 
     # Initialize Trainer
@@ -69,12 +76,20 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
+    # Set up learning rate scheduler
+    total_steps = len(tokenized_dataset) * training_args.num_train_epochs // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)
+    scheduler = get_linear_schedule_with_warmup(
+        trainer.optimizer,
+        num_warmup_steps=training_args.warmup_steps,
+        num_training_steps=total_steps
+    )
+    trainer.lr_scheduler = scheduler
+
     # Start fine-tuning
     trainer.train()
 
     # Save the fine-tuned model
     model.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
     tokenizer.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
-
 if __name__ == "__main__":
     main()
