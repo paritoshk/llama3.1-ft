@@ -1,7 +1,7 @@
 #!/bin/bash
 
-RUNPOD_IP="69.30.85.16"
-RUNPOD_PORT="22128"
+RUNPOD_IP="69.30.85.120"
+RUNPOD_PORT="22196"
 REMOTE_DIR="/root/llama3finetune"
 
 rsync -avz -e "ssh -p $RUNPOD_PORT" \
