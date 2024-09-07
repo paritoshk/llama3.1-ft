@@ -21,8 +21,6 @@ def tokenize_function(examples, tokenizer, max_length=1024):
     ]
     return tokenizer(texts, truncation=True, padding="max_length", max_length=max_length)
 
-
-
 def main():
     # Load model and tokenizer
     model_path = "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w8a16"
@@ -91,5 +89,6 @@ def main():
     # Save the fine-tuned model
     model.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
     tokenizer.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
+
 if __name__ == "__main__":
     main()
