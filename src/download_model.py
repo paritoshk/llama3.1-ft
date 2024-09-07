@@ -3,7 +3,7 @@ import os
 
 def download_model():
     model_path = "/workspace/llama3finetune/model"
-    model_name = "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w8a16"
+    model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     auth_token = os.getenv("HF_AUTH_TOKEN")  # Replace with your token
     snapshot_download(model_name, local_dir=model_path, token=auth_token)
     print(f"Model downloaded to: {model_path}")

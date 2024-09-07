@@ -32,6 +32,8 @@ def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
     
+    from transformers import BitsAndBytesConfig
+
     bnb_config = BitsAndBytesConfig(
         load_in_8bit=True,
         bnb_8bit_use_double_quant=True,
@@ -43,8 +45,7 @@ def main():
         model_path,
         device_map="auto",
         quantization_config=bnb_config,
-        torch_dtype=torch.float16,
-        use_cache=False,  # Disable KV cache
+        torch_dtype=torch.float16
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 

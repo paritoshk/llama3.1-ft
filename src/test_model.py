@@ -3,7 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
 def test_model():
-    model_path = "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w8a16"
+    model_path = "/workspace/llama3finetune/model"
     
     # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16)
