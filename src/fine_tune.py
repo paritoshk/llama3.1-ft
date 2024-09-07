@@ -1,39 +1,11 @@
 import os
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    TrainingArguments,
-    Trainer,
-    DataCollatorForLanguageModeling,
-)
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 import torch
-from peft import get_peft_model, LoraConfig, TaskType, PeftModel
-
-def tokenize_function(examples, tokenizer, max_length=1024):
-    texts = [
-        f"Subject ID: {examples['subject_id'][i]}\n"
-        f"Hospital Admission ID: {examples['hadm_id'][i]}\n"
-        f"Number of Notes: {examples['n_notes'][i]}\n"
-        f"Extractive Summary: {examples['extractive_notes_summ'][i]}\n"
-        f"Target Text: {examples['target_text'][i]}"
-        for i in range(len(examples['subject_id']))
-    ]
-    return tokenizer(texts, truncation=True, padding="max_length", max_length=max_length)
-
-def print_trainable_parameters(model):
-    """
-    Prints the number of trainable parameters in the model.
-    """
-    trainable_params = 0
-    all_param = 0
-    for _, param in model.named_parameters():
-        all_param += param.numel()
-        if param.requires_grad:
-            trainable_params += param.numel()
-    print(
-        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
-    )
+from peft import get_peft_model, LoraConfig, TaskType
+from helpers.utils import tokenize_function, print_trainable_parameters, log_gradients_requirements
+from helpers.training_args import get_training_args
+from helpers.logging import setup_tensorboard, visualize_eval
 
 def main():
     # Load model and tokenizer
@@ -56,47 +28,32 @@ def main():
         bias="none",
     )
 
-    # Create PEFT model
+    # Apply LoRA to the model
     model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()  # This is a method provided by PEFT
 
-    # Double-check trainable parameters
+    # Print trainable parameters
     print_trainable_parameters(model)
+    log_gradients_requirements(model)
 
     # Prepare dataset
-    dataset = load_from_disk("/workspace/llama3finetune/fine_tuning_dataset")
-    
-    # Use only the first 500 rows of the dataset
+    dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
+    dataset = load_from_disk(dataset_path)
     dataset = dataset.select(range(min(500, len(dataset))))
-    
+
+    # Tokenize dataset
     tokenized_dataset = dataset.map(
         lambda examples: tokenize_function(examples, tokenizer),
         batched=True,
         remove_columns=dataset.column_names,
-        num_proc=4  # Adjust based on your CPU cores
+        num_proc=4
     )
 
-    # Set up training arguments
-    training_args = TrainingArguments(
-        output_dir="/workspace/llama3finetune/results",
-        num_train_epochs=1,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
-        save_steps=50,
-        save_total_limit=2,
-        learning_rate=5e-5,
-        logging_dir="/workspace/llama3finetune/logs",
-        logging_steps=10,
-        evaluation_strategy="steps",
-        eval_steps=50,
-        load_best_model_at_end=True,
-        fp16=True,
-        gradient_checkpointing=True,
-        max_grad_norm=1.0,
-        max_steps=100,
-        warmup_ratio=0.1,
-    )
+    # Training arguments
+    training_args = get_training_args(output_dir="/workspace/llama3finetune/results")
 
+    # TensorBoard setup
+    writer = setup_tensorboard(log_dir="/workspace/llama3finetune/logs")
+    
     # Initialize Trainer
     trainer = Trainer(
         model=model,
@@ -105,12 +62,17 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
-    # Start fine-tuning
+    # Start training
+    print("Starting training...")
     trainer.train()
 
-    # Save the fine-tuned model
+    # Visualize evaluation and save metrics
+    visualize_eval(trainer, output_dir=training_args.output_dir)
+
+    # Save the fine-tuned model and tokenizer
     model.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
     tokenizer.save_pretrained("/workspace/llama3finetune/fine_tuned_llama")
+    print("Model and tokenizer saved successfully!")
 
 if __name__ == "__main__":
     main()
