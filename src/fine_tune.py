@@ -77,6 +77,7 @@ def main():
         args=training_args,
         train_dataset=tokenized_dataset,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        requirements_gradients=True,
     )
 
     # Start training with DebugTrainer
