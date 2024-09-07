@@ -85,16 +85,15 @@ def main():
 
     # Set up dataset configuration
     dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
-    train_split = "train"
-    test_split = "test"
 
-    # Load and preprocess the dataset
+    # Load the dataset
     dataset = load_from_disk(dataset_path)
     dataset = dataset.select(range(min(500, len(dataset))))  # Subset for testing
 
-    # Preprocess the dataset
-    dataset_train = dataset[train_split]
-    dataset_val = dataset[test_split]
+    # Split the dataset into train and validation sets
+    dataset = dataset.train_test_split(test_size=0.1)
+    dataset_train = dataset['train']
+    dataset_val = dataset['test']
 
     print(f"--> Training Set Length = {len(dataset_train)}")
     print(f"--> Validation Set Length = {len(dataset_val)}")
