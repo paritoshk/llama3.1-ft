@@ -1,12 +1,35 @@
 import os
 import torch
-from transformers import LlamaForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import LlamaForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 from peft import LoraConfig, get_peft_model
 from llama_recipes.utils.dataset_utils import get_preprocessed_dataset
-from llama_recipes.utils.train_utils import train, get_dataloader_kwargs
+from llama_recipes.utils.train_utils import train
 from llama_recipes.configs.training import train_config
 from llama_recipes.configs.datasets import dataset_config
+from helpers.utils import print_trainable_parameters, log_gradients_requirements
+from helpers.logging import setup_tensorboard, visualize_eval
+
+class DebugTrainer(Trainer):
+    def training_step(self, model, inputs):
+        loss = super().training_step(model, inputs)
+        print(f"Loss: {loss.item()}, requires_grad: {loss.requires_grad}")
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                print(f"Param {name} has non-zero grad")
+        return loss
+
+def check_trainable_parameters(model):
+    trainable_params = 0
+    all_params = 0
+    for name, param in model.named_parameters():
+        all_params += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+        print(f"Parameter: {name}, requires_grad: {param.requires_grad}")
+    print(f"Trainable parameters: {trainable_params}")
+    print(f"All parameters: {all_params}")
+    print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
 def main():
     # Load model and tokenizer
@@ -43,10 +66,15 @@ def main():
     # Apply LoRA to the model
     model = get_peft_model(model, peft_config)
 
+    # Print trainable parameters
+    print_trainable_parameters(model)
+    log_gradients_requirements(model)
+    check_trainable_parameters(model)
+
     # Set up training configuration
     train_config.model_name = model_path
     train_config.output_dir = output_dir
-    train_config.dataset = "custom_dataset"  # We'll use this to identify our custom dataset
+    train_config.dataset = "custom_dataset"
     train_config.num_epochs = 3
     train_config.batch_size_training = 4
     train_config.gradient_accumulation_steps = 4
@@ -74,19 +102,41 @@ def main():
     print(f"--> Training Set Length = {len(dataset_train)}")
     print(f"--> Validation Set Length = {len(dataset_val)}")
 
-    # Create DataLoader for training
-    train_dl_kwargs = get_dataloader_kwargs(train_config, dataset_train, tokenizer, "train")
-    train_dataloader = torch.utils.data.DataLoader(
-        dataset_train,
-        num_workers=train_config.num_workers_dataloader,
-        pin_memory=True,
-        **train_dl_kwargs,
+    # Training arguments
+    training_args = TrainingArguments(
+        output_dir=train_config.output_dir,
+        num_train_epochs=train_config.num_epochs,
+        per_device_train_batch_size=train_config.batch_size_training,
+        gradient_accumulation_steps=train_config.gradient_accumulation_steps,
+        learning_rate=train_config.lr,
+        fp16=train_config.use_fp16,
+        logging_dir=train_config.log_dir,
+        logging_steps=10,
+        save_strategy="epoch",
+        evaluation_strategy="epoch",
+        load_best_model_at_end=True,
+    )
+
+    # TensorBoard setup
+    writer = setup_tensorboard(log_dir=train_config.log_dir)
+
+    # Initialize DebugTrainer
+    trainer = DebugTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset_train,
+        eval_dataset=dataset_val,
+        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
     # Start training
-    results = train(model, train_dataloader, tokenizer, eval_dataloader=None, train_config=train_config)
+    print("Starting training...")
+    trainer.train()
 
-    # Save the fine-tuned model
+    # Visualize evaluation and save metrics
+    visualize_eval(trainer, output_dir=training_args.output_dir)
+
+    # Save the fine-tuned model and tokenizer
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
     print("Model and tokenizer saved successfully!")
