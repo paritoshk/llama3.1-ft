@@ -1,6 +1,6 @@
 import os
 from peft import LoraConfig, get_peft_model
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling, LlamaForCausalLM, BitsAndBytesConfig
 from datasets import load_from_disk
 import torch
 from helpers.utils import tokenize_function, print_trainable_parameters, log_gradients_requirements
@@ -32,12 +32,22 @@ def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
 
-    model = AutoModelForCausalLM.from_pretrained(
+    bnb_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        bnb_8bit_use_double_quant=True,
+        bnb_8bit_quant_type="nf4",
+        bnb_8bit_compute_dtype=torch.float16
+    )
+
+    model = LlamaForCausalLM.from_pretrained(
         model_path,
+        quantization_config=bnb_config,
         device_map="auto",
-        torch_dtype=torch.float16
+        use_cache=False,
+        torch_dtype=torch.float16,
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer.pad_token = tokenizer.eos_token
 
     # Prepare model for int8 training
 
