@@ -15,13 +15,16 @@ class DebugTrainer(Trainer):
         return loss
 
 def check_trainable_parameters(model):
-    # Debugging: Check if any parameter requires gradients
-    for param in model.parameters():
+    trainable_params = 0
+    all_params = 0
+    for name, param in model.named_parameters():
+        all_params += param.numel()
         if param.requires_grad:
-            print("At least one parameter requires gradients.")
-            break
-    else:
-        print("No parameters require gradients! Check LoRA setup.")
+            trainable_params += param.numel()
+        print(f"Parameter: {name}, requires_grad: {param.requires_grad}")
+    print(f"Trainable parameters: {trainable_params}")
+    print(f"All parameters: {all_params}")
+    print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
 def main():
     # Load model and tokenizer
@@ -77,7 +80,6 @@ def main():
         args=training_args,
         train_dataset=tokenized_dataset,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
-        requirements_gradients=True,
     )
 
     # Start training with DebugTrainer
