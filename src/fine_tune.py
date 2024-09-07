@@ -32,10 +32,21 @@ def check_trainable_parameters(model):
 def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
+    
+    from transformers import BitsAndBytesConfig
+
+    bnb_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        bnb_8bit_use_double_quant=True,
+        bnb_8bit_quant_type="nf4",
+        bnb_8bit_compute_dtype=torch.float16
+    )
+
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         device_map="auto",
-        load_in_8bit=True
+        quantization_config=bnb_config,
+        torch_dtype=torch.float16
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
