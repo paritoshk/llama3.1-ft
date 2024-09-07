@@ -8,7 +8,7 @@ from transformers import (
 )
 from datasets import load_from_disk
 import torch
-from peft import get_peft_model, LoraConfig, TaskType
+from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
 def tokenize_function(examples, tokenizer, max_length=1024):
     texts = [
@@ -20,6 +20,20 @@ def tokenize_function(examples, tokenizer, max_length=1024):
         for i in range(len(examples['subject_id']))
     ]
     return tokenizer(texts, truncation=True, padding="max_length", max_length=max_length)
+
+def print_trainable_parameters(model):
+    """
+    Prints the number of trainable parameters in the model.
+    """
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+    )
 
 def main():
     # Load model and tokenizer
@@ -38,21 +52,23 @@ def main():
         r=8,
         lora_alpha=32,
         lora_dropout=0.1,
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "down_proj", "up_proj"],
         bias="none",
-        target_modules=["q_proj", "v_proj"]
     )
-    model = get_peft_model(model, peft_config)
 
-    # Ensure all parameters that should require gradients do so
-    for name, param in model.named_parameters():
-        if "lora" in name or "Lora" in name:
-            param.requires_grad = True
+    # Create PEFT model
+    model = get_peft_model(model, peft_config)
+    model.print_trainable_parameters()  # This is a method provided by PEFT
+
+    # Double-check trainable parameters
+    print_trainable_parameters(model)
 
     # Prepare dataset
     dataset = load_from_disk("/workspace/llama3finetune/fine_tuning_dataset")
     
-     # Use only the first 500 rows of the dataset
+    # Use only the first 500 rows of the dataset
     dataset = dataset.select(range(min(500, len(dataset))))
+    
     tokenized_dataset = dataset.map(
         lambda examples: tokenize_function(examples, tokenizer),
         batched=True,
@@ -64,7 +80,7 @@ def main():
     training_args = TrainingArguments(
         output_dir="/workspace/llama3finetune/results",
         num_train_epochs=1,
-        per_device_train_batch_size=1,  # Reduced batch size
+        per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         save_steps=50,
         save_total_limit=2,
