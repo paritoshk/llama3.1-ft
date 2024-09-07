@@ -50,6 +50,9 @@ def main():
 
     # Prepare dataset
     dataset = load_from_disk("/workspace/llama3finetune/fine_tuning_dataset")
+    
+     # Use only the first 500 rows of the dataset
+    dataset = dataset.select(range(min(500, len(dataset))))
     tokenized_dataset = dataset.map(
         lambda examples: tokenize_function(examples, tokenizer),
         batched=True,
@@ -63,18 +66,18 @@ def main():
         num_train_epochs=1,
         per_device_train_batch_size=1,  # Reduced batch size
         gradient_accumulation_steps=4,
-        save_steps=500,
+        save_steps=50,
         save_total_limit=2,
         learning_rate=5e-5,
         logging_dir="/workspace/llama3finetune/logs",
         logging_steps=10,
         evaluation_strategy="steps",
-        eval_steps=500,
+        eval_steps=50,
         load_best_model_at_end=True,
         fp16=True,
         gradient_checkpointing=True,
         max_grad_norm=1.0,
-        max_steps=1000,
+        max_steps=100,
         lr_scheduler_type="linear",
         warmup_ratio=0.1,
     )
