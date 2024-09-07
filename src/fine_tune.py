@@ -24,7 +24,12 @@ def tokenize_function(examples, tokenizer, max_length=1024):
 def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
-    model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        use_cache=False  # Disable KV cache
+    )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Configure LoRA
@@ -33,8 +38,15 @@ def main():
         r=8,
         lora_alpha=32,
         lora_dropout=0.1,
+        bias="none",
+        target_modules=["q_proj", "v_proj"]
     )
     model = get_peft_model(model, peft_config)
+
+    # Ensure all parameters that should require gradients do so
+    for name, param in model.named_parameters():
+        if "lora" in name or "Lora" in name:
+            param.requires_grad = True
 
     # Prepare dataset
     dataset = load_from_disk("/workspace/llama3finetune/fine_tuning_dataset")
@@ -49,7 +61,7 @@ def main():
     training_args = TrainingArguments(
         output_dir="/workspace/llama3finetune/results",
         num_train_epochs=1,
-        per_device_train_batch_size=2,
+        per_device_train_batch_size=1,  # Reduced batch size
         gradient_accumulation_steps=4,
         save_steps=500,
         save_total_limit=2,
