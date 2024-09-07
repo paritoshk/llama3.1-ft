@@ -5,6 +5,7 @@ from datasets import load_from_disk
 from peft import LoraConfig, get_peft_model
 from helpers.utils import print_trainable_parameters, log_gradients_requirements
 from helpers.logging import setup_tensorboard, visualize_eval
+from llama_recipes.configs.training import train_config
 
 class DebugTrainer(Trainer):
     def training_step(self, model, inputs):
