@@ -28,5 +28,4 @@ def get_training_args(output_dir: str = "./results") -> TrainingArguments:
         max_grad_norm=1.0,
         max_steps=100,
         warmup_ratio=0.1,
-        load_best_model_at_end=True,
     )
