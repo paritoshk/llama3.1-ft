@@ -3,10 +3,6 @@ import torch
 from transformers import LlamaForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 from peft import LoraConfig, get_peft_model
-from llama_recipes.utils.dataset_utils import get_preprocessed_dataset
-from llama_recipes.utils.train_utils import train
-from llama_recipes.configs.training import train_config
-from llama_recipes.configs.datasets import dataset_config
 from helpers.utils import print_trainable_parameters, log_gradients_requirements
 from helpers.logging import setup_tensorboard, visualize_eval
 
@@ -75,10 +71,10 @@ def main():
     train_config.model_name = model_path
     train_config.output_dir = output_dir
     train_config.dataset = "custom_dataset"
-    train_config.num_epochs = 3
+    train_config.num_epochs = 1
     train_config.batch_size_training = 4
     train_config.gradient_accumulation_steps = 4
-    train_config.lr = 2e-4
+    train_config.lr = 5e-4
     train_config.use_peft = True
     train_config.peft_method = "lora"
     train_config.quantization = True
@@ -87,17 +83,17 @@ def main():
     train_config.log_dir = "/workspace/llama3finetune/logs"
 
     # Set up dataset configuration
-    dataset_config.dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
-    dataset_config.train_split = "train"
-    dataset_config.test_split = "test"
+    dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
+    train_split = "train"
+    test_split = "test"
 
     # Load and preprocess the dataset
-    dataset = load_from_disk(dataset_config.dataset_path)
+    dataset = load_from_disk(dataset_path)
     dataset = dataset.select(range(min(500, len(dataset))))  # Subset for testing
 
     # Preprocess the dataset
-    dataset_train = get_preprocessed_dataset(tokenizer, dataset_config, split="train")
-    dataset_val = get_preprocessed_dataset(tokenizer, dataset_config, split="test")
+    dataset_train = dataset[train_split]
+    dataset_val = dataset[test_split]
 
     print(f"--> Training Set Length = {len(dataset_train)}")
     print(f"--> Validation Set Length = {len(dataset_val)}")
