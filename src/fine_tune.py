@@ -1,6 +1,6 @@
 import os
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 import torch
 from helpers.utils import tokenize_function, print_trainable_parameters, log_gradients_requirements
@@ -31,26 +31,15 @@ def check_trainable_parameters(model):
 def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
-    
-    from transformers import BitsAndBytesConfig
-
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        bnb_8bit_use_double_quant=True,
-        bnb_8bit_quant_type="nf4",
-        bnb_8bit_compute_dtype=torch.float16
-    )
 
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         device_map="auto",
-        quantization_config=bnb_config,
         torch_dtype=torch.float16
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Prepare model for int8 training
-    model = prepare_model_for_kbit_training(model)
 
     # Configure LoRA
     peft_config = LoraConfig(
