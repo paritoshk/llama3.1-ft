@@ -12,6 +12,9 @@ class DebugTrainer(Trainer):
     def training_step(self, model, inputs):
         loss = super().training_step(model, inputs)
         print(f"Loss: {loss.item()}, requires_grad: {loss.requires_grad}")
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                print(f"Param {name} has non-zero grad")
         return loss
 
 def check_trainable_parameters(model):
@@ -47,6 +50,11 @@ def main():
 
     # Apply LoRA to the model
     model = get_peft_model(model, peft_config)
+
+    # Enable gradients for all parameters
+    model.train()
+    for param in model.parameters():
+        param.requires_grad = True
 
     # Print trainable parameters
     print_trainable_parameters(model)
