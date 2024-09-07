@@ -24,8 +24,6 @@ def main():
         r=8,
         lora_alpha=32,
         lora_dropout=0.1,
-        target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "down_proj", "up_proj"],
-        bias="none",
     )
 
     # Apply LoRA to the model
