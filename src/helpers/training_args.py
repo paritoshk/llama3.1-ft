@@ -20,12 +20,13 @@ def get_training_args(output_dir: str = "./results") -> TrainingArguments:
         learning_rate=5e-5,
         logging_dir=f"{output_dir}/logs",
         logging_steps=10,
-        eval_strategy="steps",
         eval_steps=50,
         load_best_model_at_end=True,
-        fp16=True,
+        fp16=True,  # Changed from True to False
         gradient_checkpointing=True,
         max_grad_norm=1.0,
         max_steps=100,
+        eval_strategy="steps",
         warmup_ratio=0.1,
     )
+    

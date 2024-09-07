@@ -1,8 +1,8 @@
 import os
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, DataCollatorForLanguageModeling
+from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 import torch
-from peft import get_peft_model, LoraConfig, TaskType
 from helpers.utils import tokenize_function, print_trainable_parameters, log_gradients_requirements
 from helpers.training_args import get_training_args
 from helpers.logging import setup_tensorboard, visualize_eval
@@ -29,39 +29,36 @@ def check_trainable_parameters(model):
     print(f"All parameters: {all_params}")
     print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
+
 def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         device_map="auto",
-        torch_dtype=torch.float16,
-        use_cache=False  # Disable KV cache
+        load_in_8bit=True
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
+    # Prepare model for int8 training
+    model = prepare_model_for_int8_training(model)
+
     # Configure LoRA
     peft_config = LoraConfig(
-        task_type=TaskType.CAUSAL_LM,
-        r=8,
+        task_type="CAUSAL_LM",
+        r=16,
         lora_alpha=32,
-        lora_dropout=0.1,
+        target_modules=["q_proj", "v_proj"],
+        lora_dropout=0.05,
+        bias="none",
     )
 
     # Apply LoRA to the model
     model = get_peft_model(model, peft_config)
 
-    # Enable gradients for all parameters
-    model.train()
-    for param in model.parameters():
-        param.requires_grad = True
-
     # Print trainable parameters
     print_trainable_parameters(model)
     log_gradients_requirements(model)
-
-    # Debug: Check if parameters require gradients
-    check_trainable_parameters(model)
 
     # Prepare dataset
     dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
@@ -82,15 +79,15 @@ def main():
     # TensorBoard setup
     writer = setup_tensorboard(log_dir="/workspace/llama3finetune/logs")
     
-    # Initialize DebugTrainer instead of Trainer
-    trainer = DebugTrainer(
+    # Initialize Trainer
+    trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
-    # Start training with DebugTrainer
+    # Start training
     print("Starting training...")
     trainer.train()
 
