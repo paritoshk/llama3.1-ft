@@ -1,5 +1,5 @@
 import os
-from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_from_disk
 import torch
@@ -29,7 +29,6 @@ def check_trainable_parameters(model):
     print(f"All parameters: {all_params}")
     print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
-
 def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
@@ -41,7 +40,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     # Prepare model for int8 training
-    model = prepare_model_for_int8_training(model)
+    model = prepare_model_for_kbit_training(model)
 
     # Configure LoRA
     peft_config = LoraConfig(
@@ -59,6 +58,9 @@ def main():
     # Print trainable parameters
     print_trainable_parameters(model)
     log_gradients_requirements(model)
+
+    # Debug: Check if parameters require gradients
+    check_trainable_parameters(model)
 
     # Prepare dataset
     dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
