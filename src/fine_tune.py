@@ -94,7 +94,6 @@ def main():
         gradient_checkpointing=True,
         max_grad_norm=1.0,
         max_steps=100,
-        lr_scheduler_type="linear",
         warmup_ratio=0.1,
     )
 
