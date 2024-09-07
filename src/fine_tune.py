@@ -1,13 +1,12 @@
 import os
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling
+from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer, DataCollatorForLanguageModeling, BitsAndBytesConfig
 from datasets import load_from_disk
 import torch
 from helpers.utils import tokenize_function, print_trainable_parameters, log_gradients_requirements
 from helpers.training_args import get_training_args
 from helpers.logging import setup_tensorboard, visualize_eval
 
-# Define DebugTrainer to print loss and check requires_grad
 class DebugTrainer(Trainer):
     def training_step(self, model, inputs):
         loss = super().training_step(model, inputs)
@@ -33,8 +32,6 @@ def main():
     # Load model and tokenizer
     model_path = "/workspace/llama3finetune/model"
     
-    from transformers import BitsAndBytesConfig
-
     bnb_config = BitsAndBytesConfig(
         load_in_8bit=True,
         bnb_8bit_use_double_quant=True,
@@ -46,7 +43,8 @@ def main():
         model_path,
         device_map="auto",
         quantization_config=bnb_config,
-        torch_dtype=torch.float16
+        torch_dtype=torch.float16,
+        use_cache=False,  # Disable KV cache
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
@@ -69,8 +67,6 @@ def main():
     # Print trainable parameters
     print_trainable_parameters(model)
     log_gradients_requirements(model)
-
-    # Debug: Check if parameters require gradients
     check_trainable_parameters(model)
 
     # Prepare dataset
@@ -93,7 +89,7 @@ def main():
     writer = setup_tensorboard(log_dir="/workspace/llama3finetune/logs")
     
     # Initialize Trainer
-    trainer = Trainer(
+    trainer = DebugTrainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset,
