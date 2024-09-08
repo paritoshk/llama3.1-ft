@@ -90,6 +90,16 @@ def main():
     dataset = load_from_disk(dataset_path)
     dataset = dataset.select(range(min(500, len(dataset))))  # Subset for testing
 
+    # Tokenize and process the dataset
+    def tokenize_function(examples):
+        inputs = tokenizer(examples['notes'], padding="max_length", truncation=True, max_length=train_config.context_length)
+        targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
+        inputs["labels"] = targets["input_ids"]
+        return inputs
+
+    tokenized_datasets = dataset.map(tokenize_function, batched=True, remove_columns=dataset.column_names)
+    tokenized_datasets.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+
     # Split the dataset into train and validation sets
     dataset = dataset.train_test_split(test_size=0.1)
     dataset_train = dataset['train']
@@ -111,6 +121,7 @@ def main():
         save_strategy="epoch",
         evaluation_strategy="epoch",
         load_best_model_at_end=True,
+        remove_unused_columns=False,  # Add this line
     )
 
     # TensorBoard setup
