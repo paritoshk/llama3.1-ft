@@ -96,7 +96,7 @@ def main():
     train_config.peft_method = "lora"
     train_config.quantization = True
     train_config.use_fp16 = True
-    train_config.context_length = 512
+    train_config.context_length = 1000  # Set this to match your expected input length
     train_config.log_dir = "/workspace/llama3finetune/logs"
 
     # Load dataset
@@ -121,7 +121,12 @@ def main():
         # Tokenize inputs (notes) and targets (target_text)
         inputs = tokenizer(processed_notes, padding="max_length", truncation=True, max_length=train_config.context_length)
         targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
-        inputs["labels"] = targets["input_ids"]
+        
+        # Ensure labels have the same length as input_ids
+        inputs["labels"] = [
+            [-100 if token == tokenizer.pad_token_id else token for token in target]
+            for target in targets["input_ids"]
+        ]
         return inputs
 
     # Apply tokenization and validity check
