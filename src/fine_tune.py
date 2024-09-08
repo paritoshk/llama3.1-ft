@@ -7,8 +7,10 @@ from helpers.utils import print_trainable_parameters, log_gradients_requirements
 from helpers.logging import setup_tensorboard, visualize_eval
 from llama_recipes.configs.training import train_config
 
+# Custom Trainer class to log gradients and other details
 class DebugTrainer(Trainer):
     def training_step(self, model, inputs):
+        # Perform a standard training step and print loss for debugging
         loss = super().training_step(model, inputs)
         print(f"Loss: {loss.item()}, requires_grad: {loss.requires_grad}")
         for name, param in model.named_parameters():
@@ -16,6 +18,7 @@ class DebugTrainer(Trainer):
                 print(f"Param {name} has non-zero grad")
         return loss
 
+# Function to check trainable parameters in the model
 def check_trainable_parameters(model):
     trainable_params = 0
     all_params = 0
@@ -29,10 +32,11 @@ def check_trainable_parameters(model):
     print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
 def main():
-    # Load model and tokenizer
+    # Model and Tokenizer paths
     model_path = "/workspace/llama3finetune/model"
     output_dir = "/workspace/llama3finetune/fine_tuned_llama"
 
+    # Configure for 8-bit quantization
     bnb_config = BitsAndBytesConfig(
         load_in_8bit=True,
         bnb_8bit_use_double_quant=True,
@@ -40,6 +44,7 @@ def main():
         bnb_8bit_compute_dtype=torch.float16
     )
 
+    # Load model with quantization and necessary settings
     model = LlamaForCausalLM.from_pretrained(
         model_path,
         quantization_config=bnb_config,
@@ -47,10 +52,12 @@ def main():
         use_cache=False,
         torch_dtype=torch.float16,
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    tokenizer.pad_token = tokenizer.eos_token
 
-    # Configure LoRA
+    # Load and configure tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer.pad_token = tokenizer.eos_token  # Set EOS as pad token
+
+    # LoRA configuration (low-rank adaptation)
     peft_config = LoraConfig(
         task_type="CAUSAL_LM",
         r=16,
@@ -63,15 +70,14 @@ def main():
     # Apply LoRA to the model
     model = get_peft_model(model, peft_config)
 
-    # Print trainable parameters
+    # Print trainable parameters for debugging
     print_trainable_parameters(model)
     log_gradients_requirements(model)
     check_trainable_parameters(model)
 
-    # Set up training configuration
+    # Training configuration
     train_config.model_name = model_path
     train_config.output_dir = output_dir
-    train_config.dataset = "custom_dataset"
     train_config.num_epochs = 1
     train_config.batch_size_training = 4
     train_config.gradient_accumulation_steps = 4
@@ -83,27 +89,37 @@ def main():
     train_config.context_length = 512
     train_config.log_dir = "/workspace/llama3finetune/logs"
 
-    # Set up dataset configuration
+    # Load dataset
     dataset_path = "/workspace/llama3finetune/fine_tuning_dataset"
-
-    # Load the dataset
     dataset = load_from_disk(dataset_path)
-    dataset = dataset.select(range(min(500, len(dataset))))  # Subset for testing
 
-    # Tokenize and process the dataset
+    # Check for any non-string data and handle it
+    def check_validity(examples):
+        if not isinstance(examples['notes'], str) or not isinstance(examples['target_text'], str):
+            raise ValueError("Input data must be of type `str`.")
+        return True
+
+    # Tokenize the dataset, ensure inputs and targets are properly formatted
     def tokenize_function(examples):
         inputs = tokenizer(examples['notes'], padding="max_length", truncation=True, max_length=train_config.context_length)
         targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
         inputs["labels"] = targets["input_ids"]
         return inputs
 
-    tokenized_datasets = dataset.map(tokenize_function, batched=True, remove_columns=dataset.column_names)
+    # Apply tokenization and validity check
+    tokenized_datasets = dataset.map(
+        lambda x: tokenize_function(x) if check_validity(x) else None,
+        batched=True,
+        remove_columns=dataset.column_names
+    )
+
+    # Set correct format for PyTorch
     tokenized_datasets.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
-    # Split the dataset into train and validation sets
-    dataset = dataset.train_test_split(test_size=0.1)
-    dataset_train = dataset['train']
-    dataset_val = dataset['test']
+    # Split into train and validation sets
+    dataset_split = tokenized_datasets.train_test_split(test_size=0.1)
+    dataset_train = dataset_split['train']
+    dataset_val = dataset_split['test']
 
     print(f"--> Training Set Length = {len(dataset_train)}")
     print(f"--> Validation Set Length = {len(dataset_val)}")
@@ -121,13 +137,13 @@ def main():
         save_strategy="epoch",
         evaluation_strategy="epoch",
         load_best_model_at_end=True,
-        remove_unused_columns=False,  # Add this line
+        remove_unused_columns=False  # Ensure columns aren't inadvertently removed
     )
 
-    # TensorBoard setup
+    # Set up TensorBoard logging
     writer = setup_tensorboard(log_dir=train_config.log_dir)
 
-    # Initialize DebugTrainer
+    # Initialize DebugTrainer with train and validation datasets
     trainer = DebugTrainer(
         model=model,
         args=training_args,
@@ -136,11 +152,11 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
-    # Start training
+    # Start training and log the process
     print("Starting training...")
     trainer.train()
 
-    # Visualize evaluation and save metrics
+    # Visualize evaluation metrics and save results
     visualize_eval(trainer, output_dir=training_args.output_dir)
 
     # Save the fine-tuned model and tokenizer
