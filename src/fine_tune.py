@@ -122,11 +122,14 @@ def main():
         inputs = tokenizer(processed_notes, padding="max_length", truncation=True, max_length=train_config.context_length)
         targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
         
-        # Ensure labels have the same length as input_ids
-        inputs["labels"] = [
-            [-100 if token == tokenizer.pad_token_id else token for token in target]
-            for target in targets["input_ids"]
-        ]
+        inputs["labels"] = targets["input_ids"]
+        
+        # Ensure all tensors have the same length
+        for key in inputs:
+            inputs[key] = inputs[key][:train_config.context_length]
+            if len(inputs[key]) < train_config.context_length:
+                inputs[key] = inputs[key] + [0] * (train_config.context_length - len(inputs[key]))
+        
         return inputs
 
     # Apply tokenization and validity check

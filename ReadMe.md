@@ -3,6 +3,7 @@
 This project demonstrates how to host and fine-tune the LLaMA 3 70B model using a custom dataset on RunPod.
 
 ## Project Structure
+```
 /workspace/llama3finetune/
 ├── fine_tuned_llama/ # Directory for the fine-tuned model
 ├── fine_tuning_dataset/ # Custom dataset for fine-tuning
@@ -11,7 +12,7 @@ This project demonstrates how to host and fine-tune the LLaMA 3 70B model using 
 ├── logs/ # Training logs
 ├── model/ # Pre-trained LLaMA 3 70B model
 └── results/ # Fine-tuning results
-
+```
 
 
 ## Setup Instructions
@@ -120,5 +121,36 @@ After fine-tuning your model using the training script, run this compare_models.
 
 
 
+```
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
-ChatGPT can make mistakes. Check important info.
+def test_model(model_path, prompt):
+    # Load the fine-tuned model and tokenizer
+    model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+    # Tokenize and generate output
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(**inputs, max_length=200, num_return_sequences=1)
+    
+    # Decode and print the result
+    result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return result
+
+def compare_models(base_model_path, fine_tuned_model_path, prompt):
+    print("Testing Base Model:")
+    base_model_result = test_model(base_model_path, prompt)
+    print(f"Base Model Response: {base_model_result}\n")
+
+    print("Testing Fine-Tuned Model:")
+    fine_tuned_result = test_model(fine_tuned_model_path, prompt)
+    print(f"Fine-Tuned Model Response: {fine_tuned_result}\n")
+
+if __name__ == "__main__":
+    prompt = "Summarize this medical note: [Insert example note here]"
+    base_model_path = "/workspace/llama3finetune/base_model"
+    fine_tuned_model_path = "/workspace/llama3finetune/fine_tuned_llama"
+    
+    compare_models(base_model_path, fine_tuned_model_path, prompt)
+```
