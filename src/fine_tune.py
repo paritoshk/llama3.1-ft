@@ -12,9 +12,9 @@ class DebugTrainer(Trainer):
     def training_step(self, model, inputs):
         # Perform a standard training step and print loss for debugging
         loss = super().training_step(model, inputs)
-        print(f"Loss: {loss.item()}, requires_grad: {loss.requires_grad}")
+        print(f"Loss: {loss.item()}")
         for name, param in model.named_parameters():
-            if param.grad is not None:
+            if param.requires_grad and param.grad is not None:
                 print(f"Param {name} has non-zero grad")
         return loss
 
@@ -31,6 +31,16 @@ def check_trainable_parameters(model):
     print(f"All parameters: {all_params}")
     print(f"Percentage of trainable parameters: {100 * trainable_params / all_params:.2f}%")
 
+# Function to preprocess notes field (handling lists of dictionaries)
+def preprocess_notes(examples):
+    processed_notes = []
+    for note_list in examples['notes']:
+        # Concatenate the 'description' field from each note dictionary
+        concatenated_note = " ".join(note.get('description', '') for note in note_list)
+        processed_notes.append(concatenated_note)
+    return processed_notes
+
+# Main training function
 def main():
     # Model and Tokenizer paths
     model_path = "/workspace/llama3finetune/model"
@@ -95,13 +105,17 @@ def main():
 
     # Check for any non-string data and handle it
     def check_validity(examples):
-        if not isinstance(examples['notes'], str) or not isinstance(examples['target_text'], str):
-            raise ValueError("Input data must be of type `str`.")
+        if not isinstance(examples['target_text'], str):
+            raise ValueError("Target text must be of type `str`.")
         return True
 
     # Tokenize the dataset, ensure inputs and targets are properly formatted
     def tokenize_function(examples):
-        inputs = tokenizer(examples['notes'], padding="max_length", truncation=True, max_length=train_config.context_length)
+        # Preprocess notes field
+        processed_notes = preprocess_notes(examples)
+        
+        # Tokenize inputs (notes) and targets (target_text)
+        inputs = tokenizer(processed_notes, padding="max_length", truncation=True, max_length=train_config.context_length)
         targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
         inputs["labels"] = targets["input_ids"]
         return inputs
