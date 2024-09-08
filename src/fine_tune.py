@@ -96,7 +96,7 @@ def main():
     train_config.peft_method = "lora"
     train_config.quantization = True
     train_config.use_fp16 = True
-    train_config.context_length = 1000  # Set this to match your expected input length
+    train_config.context_length = 1024  # Set this to match your expected input length
     train_config.log_dir = "/workspace/llama3finetune/logs"
 
     # Load dataset
@@ -115,20 +115,14 @@ def main():
 
     # Tokenize the dataset, ensure inputs and targets are properly formatted
     def tokenize_function(examples):
-        # Preprocess notes field
         processed_notes = preprocess_notes(examples)
-        
-        # Tokenize inputs (notes) and targets (target_text)
         inputs = tokenizer(processed_notes, padding="max_length", truncation=True, max_length=train_config.context_length)
         targets = tokenizer(examples['target_text'], padding="max_length", truncation=True, max_length=train_config.context_length)
         
-        inputs["labels"] = targets["input_ids"]
-        
-        # Ensure all tensors have the same length
         for key in inputs:
-            inputs[key] = inputs[key][:train_config.context_length]
-            if len(inputs[key]) < train_config.context_length:
-                inputs[key] = inputs[key] + [0] * (train_config.context_length - len(inputs[key]))
+            inputs[key] = [list(x) for x in inputs[key]]  # Ensure all values are lists
+        
+        inputs["labels"] = [list(x) for x in targets["input_ids"]]  # Ensure labels are lists
         
         return inputs
 
