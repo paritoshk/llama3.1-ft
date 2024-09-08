@@ -105,9 +105,13 @@ def main():
 
     # Check for any non-string data and handle it
     def check_validity(examples):
-        if not isinstance(examples['target_text'], str):
-            raise ValueError("Target text must be of type `str`.")
-        return True
+        if isinstance(examples['target_text'], list):
+            # If it's a list, join the elements into a single string
+            examples['target_text'] = ' '.join(map(str, examples['target_text']))
+        elif not isinstance(examples['target_text'], str):
+            # If it's not a string or list, convert it to a string
+            examples['target_text'] = str(examples['target_text'])
+        return examples
 
     # Tokenize the dataset, ensure inputs and targets are properly formatted
     def tokenize_function(examples):
@@ -122,7 +126,7 @@ def main():
 
     # Apply tokenization and validity check
     tokenized_datasets = dataset.map(
-        lambda x: tokenize_function(x) if check_validity(x) else None,
+        lambda x: tokenize_function(check_validity(x)),
         batched=True,
         remove_columns=dataset.column_names
     )
