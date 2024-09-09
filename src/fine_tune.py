@@ -73,10 +73,16 @@ def main():
 
     tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
+    # Split the dataset into train and validation
+    train_val_split = tokenized_dataset.train_test_split(test_size=0.1)
+    train_dataset = train_val_split["train"]
+    val_dataset = train_val_split["test"]
+
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=1,
         per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
         gradient_accumulation_steps=4,
         learning_rate=5e-4,
         fp16=True,
@@ -90,7 +96,8 @@ def main():
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_dataset,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 

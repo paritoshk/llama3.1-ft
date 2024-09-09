@@ -95,6 +95,59 @@ Our `fine_tune.py` script:
 - Expand the custom dataset for better performance
 - Implement advanced techniques like mixed-precision training
 
+# RunPod Process Automation 
+The issue you're experiencing is related to your SSH connection being interrupted when you close your laptop, which is causing the training process to stop. This isn't a problem with the VM itself - the VM is still running, but the process you started over SSH is terminated when the connection drops.
+To keep your process running even when you disconnect, you don't need to use Terraform or Docker (although Docker can be useful for other reasons). Instead, you can use a terminal multiplexer like tmux or screen. These tools allow you to create persistent sessions that continue running even when you disconnect from SSH.
+Here's how you can use tmux to keep your process running:
+
+If tmux isn't installed on your VM, install it:
+```bash
+
+sudo apt-get update
+sudo apt-get install tmux
+
+```
+
+Start a new tmux session:
+```bash
+
+tmux new -s training
+
+```
+
+Once inside the tmux session, navigate to your project directory and start your training process as usual.
+To detach from the tmux session without stopping it, press Ctrl+B, then D. This will return you to your normal terminal, but the process will keep running in the background.
+You can now safely close your laptop or disconnect from SSH. The process will continue running on the VM.
+When you want to check on your process later, SSH back into your VM and reattach to the tmux session:
+
+```bash
+
+tmux attach -t training
+
+```
+
+
+
+This way, even if your SSH connection drops, your training process will continue running in the background. You can reconnect to it at any time to check its progress.
+Alternative approach using nohup:
+If you prefer not to use tmux, you can also use the nohup command to run your script:
+
+```bash
+
+nohup python your_script.py > output.log 2>&1 &
+
+```
+
+This will start your script in the background, redirect all output to output.log, and keep it running even if you disconnect. You can check the progress by examining the log file:
+
+```bash
+
+tail -f output.log
+
+```
+
+Remember to use htop or ps aux | grep python to find the process ID if you need to stop it later.
+
 # Compare Models
 
 Key Points:
