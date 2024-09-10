@@ -1,6 +1,7 @@
 # LLaMA 3 70B Model Fine-tuning on RunPod
 
 This project demonstrates how to host and fine-tune the LLaMA 3 70B model using a custom dataset on RunPod.
+Cost of training 500 rows of clinical notes $1.284 I used the A100 PCIe, 80GB of VRAM with 50GB of volume and container storage. RAM 117GB and 12 vCPUs. 
 
 ## Project Structure
 ```
