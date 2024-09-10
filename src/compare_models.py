@@ -26,7 +26,7 @@ def compare_models():
     fine_tuned_tokenizer = AutoTokenizer.from_pretrained(fine_tuned_model_path)
 
     # Test prompt
-    prompt = "Explain the concept of quantum computing in simple terms."
+    prompt = "Explain the concept of clinical notes, EHR and usage of computing in healthcare in scientific terms that a patient with no medical background but chronic kidney disease would understand."
 
     # Generate response from base model
     print("\nGenerating response from base model...")

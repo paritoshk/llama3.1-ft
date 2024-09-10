@@ -31,7 +31,7 @@ This project demonstrates how to host and fine-tune the LLaMA 3 70B model using 
 
 3. Install required packages:
    ```
-   pip install torch transformers datasets runpod sentencepiece huggingface_hub
+   pip install torch perft accelerate transformers datasets runpod sentencepiece huggingface_hub
    ```
 
 4. Set up Hugging Face authentication:
@@ -52,6 +52,8 @@ This project demonstrates how to host and fine-tune the LLaMA 3 70B model using 
 7. Start fine-tuning:
    ```
    python src/fine_tune.py
+   nohup python src/fine_tune.py > output.log 2>&1 &
+   tail -f output.log
    ```
 
 ## Why These Choices?

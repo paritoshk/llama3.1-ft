@@ -39,13 +39,26 @@ def main():
         bnb_8bit_compute_dtype=torch.float16
     )
 
-    model = LlamaForCausalLM.from_pretrained(
-        model_path,
-        quantization_config=bnb_config,
-        device_map="auto",
-        use_cache=False,
-        torch_dtype=torch.float16,
-    )
+    print(f"Attempting to load model from: {model_path}")
+    try:
+        model = LlamaForCausalLM.from_pretrained(
+            model_path,
+            quantization_config=bnb_config,
+            device_map="auto",
+            use_cache=False,
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+        )
+    except Exception as e:
+        print(f"Error loading model: {str(e)}")
+        print("Checking model files...")
+        import os
+        for root, dirs, files in os.walk(model_path):
+            for file in files:
+                print(os.path.join(root, file))
+        return
+
+    print("Model loaded successfully")
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     tokenizer.pad_token = tokenizer.eos_token
@@ -62,6 +75,7 @@ def main():
     model = get_peft_model(model, peft_config)
     print_trainable_parameters(model)
 
+    print(f"Loading dataset from: {dataset_path}")
     dataset = load_from_disk(dataset_path)
     max_length = 512  # Adjust this based on your needs
 
@@ -73,7 +87,6 @@ def main():
 
     tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
-    # Split the dataset into train and validation
     train_val_split = tokenized_dataset.train_test_split(test_size=0.1)
     train_dataset = train_val_split["train"]
     val_dataset = train_val_split["test"]
